@@ -410,8 +410,10 @@
             const paymentStatus = booking.paymentStatus || 'N/A';
             switch (paymentStatus.toLowerCase()) {
                 case 'paid':
-                case 'cod':
-                    paymentStatusHtml = `<span class="font-medium text-green-500">${paymentStatus.charAt(0).toUpperCase() + paymentStatus.slice(1)}</span>`;
+                    paymentStatusHtml = `<span class="font-medium text-green-500">Paid</span>`;
+                    break;
+                case 'cos':
+                    paymentStatusHtml = `<span class="font-medium text-green-500">Cash on Shipping</span>`;
                     break;
                 case 'pending':
                     paymentStatusHtml = `<button class="repay-btn font-medium text-yellow-500 hover:underline cursor-pointer" data-booking-id="${booking.bookingId}" data-amount="${booking.amount || 0}">Pending</button>`;

@@ -163,9 +163,8 @@
 <label class="flex items-center p-4 border rounded-lg cursor-pointer hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-700">
 <input type="radio" name="payment" value="cod" checked class="mr-3 h-5 w-5 text-primary focus:ring-primary border-gray-300">
 <div>
-<p class="font-medium">Cash on Delivery</p>
-<p class="text-sm text-gray-500 dark:text-gray-400">Pay when parcel is delivered</p>
-</div>
+<p class="font-medium">Cash on Shipping</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Pay when parcel is shipped</p></div>
 </label>
 <label class="flex items-center p-4 border rounded-lg cursor-pointer hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-700">
 <input type="radio" name="payment" value="online" class="mr-3 h-5 w-5 text-primary focus:ring-primary border-gray-300">
@@ -296,8 +295,8 @@
 
         if (bookingData.paymentMethod === 'online') {
             await initiatePayment(bookingData);
-        } else { // Cash on Delivery
-            bookingData.paymentStatus = 'cod';
+        } else { // Cash on Shipping
+            bookingData.paymentStatus = 'cos';
             await saveBooking(bookingData);
         }
     });
