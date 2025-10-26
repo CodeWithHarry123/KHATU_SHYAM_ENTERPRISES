@@ -43,9 +43,22 @@
             },
         };
     </script>
+    <style>
+         @keyframes slide-in {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+         @keyframes slide-out {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+        .animate-slide-in { animation: slide-in 0.3s ease-out; }
+        .animate-slide-out { animation: slide-out 0.3s ease-in; }
+    </style>
 </head>
 
 <body class="bg-background-light dark:bg-background-dark font-display text-text-light dark:text-text-dark">
+    <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
     <div class="relative flex min-h-screen w-full flex-col group/design-root overflow-x-hidden">
         <div class="flex h-full grow">
             <!-- Sidebar -->
@@ -180,6 +193,39 @@
         </div>
     </div>
     <script>
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+
+            const colors = {
+                success: 'bg-green-500',
+                error: 'bg-red-500',
+                warning: 'bg-yellow-500',
+                info: 'bg-blue-500'
+            };
+            const icons = {
+                success: '✓',
+                error: '✗',
+                warning: '⚠',
+                info: 'ℹ'
+            };
+
+            const toast = document.createElement('div');
+            toast.className = `${colors[type]} text-white px-6 py-4 rounded-lg shadow-lg flex items-center space-x-3 animate-slide-in`;
+            toast.innerHTML = `
+                <span class="text-2xl">${icons[type]}</span>
+                <span class="font-medium">${message}</span>
+                <button onclick="this.parentElement.remove()" class="ml-4 text-white hover:text-gray-200">✕</button>
+            `;
+
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.add('animate-slide-out');
+                setTimeout(() => toast.remove(), 300);
+            }, 5000);
+        }
+
         // --- AUTHENTICATION ---
         auth.onAuthStateChanged(user => {
             if (user) {
@@ -193,7 +239,7 @@
                         } else {
                             // User is not an admin, redirect them.
                             console.log("Access Denied: User is not an admin.");
-                            alert("Access Denied. You do not have permission to view this page.");
+                            showToast("Access Denied. You do not have permission to view this page.", "error");
                             window.location.href = 'dashboard.html'; // Redirect to dashboard
                         }
                     })
@@ -341,6 +387,7 @@
                     }
                 }
             });
+
         }
     </script>
 </body>

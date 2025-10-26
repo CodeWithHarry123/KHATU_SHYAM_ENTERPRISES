@@ -212,43 +212,57 @@
             });
 
             verifyOtpButton.addEventListener('click', () => {
-                const otp = Array.from(document.querySelectorAll('.otp-input')).map(input => input.value).join('');
-                if (otp.length !== 6) {
-                    errorMessage.textContent = "Please enter a valid 6-digit OTP.";
+                const verificationCode = Array.from(document.querySelectorAll('.otp-input')).map(input => input.value).join('');
+                const errorMessage = document.getElementById('error-message');
+
+                if (!verificationCode || verificationCode.length !== 6) {
+                    errorMessage.textContent = 'Please enter a valid 6-digit OTP.';
                     return;
                 }
-
-                confirmationResult.confirm(otp).then((result) => {
-                    // User signed in successfully.
+                
+                confirmationResult.confirm(verificationCode).then(async (result) => {
                     const user = result.user;
-                    console.log("User signed in:", user);
+                    const phoneNumber = user.phoneNumber;
                     
-                    // Check if user exists in Firestore, if not, create a new document
-                    const userRef = db.collection('users').doc(user.uid);
-                    userRef.get().then((doc) => {
-                        if (!doc.exists) {
-                            // New user: create document and set isAdmin to false by default
-                            userRef.set({
-                                phoneNumber: user.phoneNumber,
+                    try {
+                        // Pehle check karein ki user already exist karta hai ya nahi
+                        const userDoc = await db.collection('users').doc(user.uid).get();
+                        
+                        if (!userDoc.exists) {
+                            // Naya user hai, to Firestore mein save karein
+                            await db.collection('users').doc(user.uid).set({
+                                phoneNumber: phoneNumber,
+                                uid: user.uid,
+                                khatu_website_admin: false, // Default admin status
                                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                                isAdmin: false
-                            }).then(() => {
-                                window.location.href = 'dashboard.html';
+                                name: phoneNumber, // Default name phone number hai
+                                email: '', // Blank email
+                                address: '' // Blank address
                             });
+                            
+                            console.log('New user added to Firestore database');
                         } else {
-                            // Existing user, check if they are an admin and redirect accordingly
-                            if (doc.data().khatu_website_admin) {
-                                window.location.href = 'admin_dashboard.html';
-                            } else {
-                                window.location.href = 'dashboard.html';
-                            }
+                            console.log('User already exists in database');
                         }
-                    });
-
+                        
+                        // User role check karein aur redirect karein
+                        const userData = await db.collection('users').doc(user.uid).get();
+                        const isAdmin = userData.data().khatu_website_admin;
+                        
+                        if (isAdmin === true) {
+                            window.location.href = 'admin_dashboard.html';
+                        } else {
+                            window.location.href = 'dashboard.html';
+                        }
+                        
+                    } catch (error) {
+                        console.error('Error saving user to database:', error);
+                        errorMessage.textContent = 'Login successful but error saving user data. Please contact support.';
+                    }
+                    
                 }).catch((error) => {
-                    // User couldn't sign in (bad verification code?)
-                    console.error("Error verifying OTP:", error);
-                    errorMessage.textContent = "Invalid OTP. Please try again.";
+                    errorMessage.textContent = 'Invalid verification code. Please try again.';
+                    console.error('Verification error:', error);
                 });
             });
         }

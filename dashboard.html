@@ -40,8 +40,38 @@
             },
         };
     </script>
+<style>
+        .text-delivered { color: #4CAF50; }
+        .bg-delivered\/20 { background-color: rgba(76, 175, 80, 0.2); }
+        .text-in-transit { color: #FB8C00; }
+        .bg-in-transit\/20 { background-color: rgba(251, 140, 0, 0.2); }
+        .text-booked { color: #2196F3; }
+        .bg-booked\/20 { background-color: rgba(33, 150, 243, 0.2); }
+
+         @keyframes slide-in {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+         @keyframes slide-out {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+        .animate-slide-in { animation: slide-in 0.3s ease-out; }
+        .animate-slide-out { animation: slide-out 0.3s ease-in; }
+    </style>
 </head>
 <body class="bg-background-light dark:bg-background-dark font-display">
+<div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
+<!-- Loading overlay HTML -->
+<div id="loading-overlay" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-8 flex flex-col items-center">
+        <svg class="animate-spin h-12 w-12 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <p class="mt-4 text-gray-700 font-medium">Loading...</p>
+    </div>
+</div>
 <div class="relative flex h-auto min-h-screen w-full flex-col group/design-root overflow-x-hidden">
 <div class="layout-container flex h-full grow flex-col">
 <header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-gray-200 dark:border-gray-700 px-4 sm:px-10 py-3 bg-white dark:bg-background-dark">
@@ -123,6 +153,7 @@
 <th class="px-6 py-4 text-left text-sm font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Booking Date</th>
 <th class="px-6 py-4 text-left text-sm font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Destination</th>
 <th class="px-6 py-4 text-left text-sm font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Current Status</th>
+<th class="px-6 py-4 text-left text-sm font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Payment Status</th>
 <th class="px-6 py-4 text-left text-sm font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Action</th>
 </tr>
 </thead>
@@ -179,6 +210,24 @@
                 </a>
             </div>
         </div>
+
+        <!-- Repayment QR Code Modal -->
+        <div id="repayment-qr-modal" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden items-center justify-center p-4">
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-sm text-center p-6 sm:p-8 relative">
+                <button id="repayment-modal-close-button" class="absolute top-2 right-2 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+                <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-4">Complete Your Payment</h2>
+                <p class="text-gray-600 dark:text-gray-300 mb-4">Scan the QR code below with any UPI app to complete the payment for your booking.</p>
+                <div id="repayment-qr-container" class="flex justify-center p-4 bg-white rounded-lg">
+                    <!-- QR Code will be injected here -->
+                </div>
+                <div class="mt-4">
+                    <p class="text-gray-500 dark:text-gray-400">Booking ID: <span id="repayment-booking-id" class="font-bold"></span></p>
+                    <p class="text-lg font-bold">Amount: ₹<span id="repayment-amount"></span></p>
+                </div>
+            </div>
+        </div>
 </footer>
 </div>
 </div>
@@ -191,6 +240,55 @@
         .bg-booked\/20 { background-color: rgba(33, 150, 243, 0.2); }
     </style>
 <script>
+    function showToast(message, type = 'info') {
+        const container = document.getElementById('toast-container');
+        if (!container) return;
+
+        const colors = {
+            success: 'bg-green-500',
+            error: 'bg-red-500',
+            warning: 'bg-yellow-500',
+            info: 'bg-blue-500'
+        };
+        const icons = {
+            success: '✓',
+            error: '✗',
+            warning: '⚠',
+            info: 'ℹ'
+        };
+
+        const toast = document.createElement('div');
+        toast.className = `${colors[type]} text-white px-6 py-4 rounded-lg shadow-lg flex items-center space-x-3 animate-slide-in`;
+        toast.innerHTML = `
+            <span class="text-2xl">${icons[type]}</span>
+            <span class="font-medium">${message}</span>
+            <button onclick="this.parentElement.remove()" class="ml-4 text-white hover:text-gray-200">✕</button>
+        `;
+
+        container.appendChild(toast);
+
+        setTimeout(() => {
+            toast.classList.add('animate-slide-out');
+            setTimeout(() => toast.remove(), 300);
+        }, 5000);
+    }
+
+    // Loading functions
+    function showLoading(message = 'Loading...') {
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) {
+            overlay.querySelector('p').textContent = message;
+            overlay.classList.remove('hidden');
+        }
+    }
+
+    function hideLoading() {
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) {
+            overlay.classList.add('hidden');
+        }
+    }
+
     // --- GLOBAL STATE ---
     let allBookings = [];
     let currentFilter = 'All';
@@ -207,40 +305,67 @@
     const filterButtonsContainer = document.getElementById('filter-buttons');
 
     // --- AUTHENTICATION & INITIAL LOAD ---
-    auth.onAuthStateChanged(user => {
-        if (user) {
-            const userRef = db.collection('users').doc(user.uid);
-            userRef.get().then(doc => {
-                if (doc.exists) {
-                    const userData = doc.data();
-                    if (!userData.name || !userData.address || !userData.pincode) {
-                        const profileUpdateModal = document.getElementById('profile-update-modal');
+    window.addEventListener('DOMContentLoaded', () => {
+        auth.onAuthStateChanged(async (user) => {
+            if (!user) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            showLoading('Authenticating...');
+            try {
+                const userDoc = await db.collection('users').doc(user.uid).get();
+
+                if (!userDoc.exists) {
+                    showToast('User data not found. Please contact support.', 'error');
+                    auth.signOut();
+                    window.location.href = 'login.html';
+                    return;
+                }
+
+                const userData = userDoc.data();
+                console.log('User logged in:', userData);
+
+                if (userData.khatu_website_admin === true) {
+                    window.location.href = 'admin_dashboard.html';
+                    return;
+                }
+
+                if (!userData.name || !userData.address) {
+                    const profileUpdateModal = document.getElementById('profile-update-modal');
+                    if (profileUpdateModal) {
                         profileUpdateModal.classList.remove('hidden');
                         profileUpdateModal.classList.add('flex');
                     }
                 }
-            });
-            loadBookings(user.uid);
-        } else {
-            window.location.href = 'login.html';
-        }
+
+                await loadBookings(user.uid);
+
+            } catch (error) {
+                console.error('Error loading user data:', error);
+                showToast('Error loading dashboard. Please try again.', 'error');
+                hideLoading();
+            }
+        });
     });
 
-    function loadBookings(userId) {
-        db.collection('bookings').where('userId', '==', userId).orderBy('bookingDate', 'desc').get()
-            .then((querySnapshot) => {
-                allBookings = [];
-                querySnapshot.forEach((doc) => {
-                    allBookings.push({ id: doc.id, ...doc.data() });
-                });
-                applyFiltersAndSearch(); // Initial render
-            })
-            .catch((error) => {
-                console.error("Error getting documents: ", error);
-                const errorHtml = `<div class="text-center py-10 text-red-500 col-span-full">Error loading bookings.</div>`;
-                bookingsTableBody.innerHTML = `<tr><td colspan="5" class="text-center py-10 text-red-500">Error loading bookings.</td></tr>`;
-                bookingsCardView.innerHTML = errorHtml;
+    async function loadBookings(userId) {
+        showLoading('Fetching your bookings...');
+        try {
+            const querySnapshot = await db.collection('bookings').where('userId', '==', userId).orderBy('bookingDate', 'desc').get();
+            allBookings = [];
+            querySnapshot.forEach((doc) => {
+                allBookings.push({ id: doc.id, ...doc.data() });
             });
+            applyFiltersAndSearch();
+        } catch (error) {
+            console.error("Error getting documents: ", error);
+            const errorHtml = `<div class="text-center py-10 text-red-500 col-span-full">Error loading bookings.</div>`;
+            bookingsTableBody.innerHTML = `<tr><td colspan="5" class="text-center py-10 text-red-500">Error loading bookings.</td></tr>`;
+            bookingsCardView.innerHTML = errorHtml;
+        } finally {
+            hideLoading();
+        }
     }
 
     // --- RENDERING & FILTERING LOGIC ---
@@ -271,7 +396,7 @@
 
         if (bookings.length === 0) {
             const noDataHtml = `<div class="text-center py-10 col-span-full">No bookings match your criteria.</div>`;
-            bookingsTableBody.innerHTML = `<tr><td colspan="5" class="text-center py-10">No bookings match your criteria.</td></tr>`;
+            bookingsTableBody.innerHTML = `<tr><td colspan="6" class="text-center py-10">No bookings match your criteria.</td></tr>`;
             bookingsCardView.innerHTML = noDataHtml;
             return;
         }
@@ -279,6 +404,21 @@
         bookings.forEach(booking => {
             const bookingDate = booking.bookingDate ? booking.bookingDate.toDate().toLocaleDateString() : 'Processing...';
             const statusClass = getStatusClass(booking.status);
+
+            // Payment Status Styling
+            let paymentStatusHtml = '';
+            const paymentStatus = booking.paymentStatus || 'N/A';
+            switch (paymentStatus.toLowerCase()) {
+                case 'paid':
+                case 'cod':
+                    paymentStatusHtml = `<span class="font-medium text-green-500">${paymentStatus.charAt(0).toUpperCase() + paymentStatus.slice(1)}</span>`;
+                    break;
+                case 'pending':
+                    paymentStatusHtml = `<button class="repay-btn font-medium text-yellow-500 hover:underline cursor-pointer" data-booking-id="${booking.bookingId}" data-amount="${booking.amount || 0}">Pending</button>`;
+                    break;
+                default:
+                    paymentStatusHtml = `<span class="font-medium text-gray-500">${paymentStatus.charAt(0).toUpperCase() + paymentStatus.slice(1)}</span>`;
+            }
 
             const row = `
                 <tr>
@@ -288,6 +428,7 @@
                     <td class="px-6 py-4 whitespace-nowrap">
                         <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">${booking.status}</span>
                     </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">${paymentStatusHtml}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <a class="view-details-btn text-primary hover:text-primary-dark dark:text-secondary dark:hover:text-secondary-light flex items-center gap-1" href="#" data-booking-id="${booking.id}">
                             View Details <span class="material-symbols-outlined text-lg">visibility</span>
@@ -305,6 +446,7 @@
                     </div>
                     <div class="text-sm">
                         <p class="text-gray-600 dark:text-gray-300">To: ${booking.receiverDetails.address}, ${booking.receiverDetails.pincode}</p>
+                        <p class="text-gray-600 dark:text-gray-300">Payment: ${paymentStatusHtml}</p>
                     </div>
                     <div class="text-xs text-gray-400 dark:text-gray-500 pt-2 border-t border-gray-200 dark:border-gray-700">
                         Booked on: ${bookingDate}
@@ -325,6 +467,54 @@
             case 'Booked': default: return 'bg-booked/20 text-booked';
         }
     }
+
+    // --- REPAYMENT LOGIC ---
+    const VPA = '123123xxx42@axl';
+    const PAYEE_NAME = 'Khatu Shyam Enterprises';
+    const repaymentModal = document.getElementById('repayment-qr-modal');
+    const repaymentModalClose = document.getElementById('repayment-modal-close-button');
+
+    document.body.addEventListener('click', function(event) {
+        const repayBtn = event.target.closest('.repay-btn');
+        if (repayBtn) {
+            event.preventDefault();
+            const bookingId = repayBtn.dataset.bookingId;
+            const amount = repayBtn.dataset.amount;
+
+            if (!bookingId || !amount || amount === '0') {
+                showToast('Could not initiate payment. Amount is zero or data is missing.', 'error');
+                return;
+            }
+
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            const upiString = `upi://pay?pa=${VPA}&pn=${encodeURIComponent(PAYEE_NAME)}&am=${amount}&cu=INR&tn=${bookingId}`;
+
+            if (isMobile) {
+                // On mobile, redirect to UPI app
+                window.location.href = upiString;
+            } else {
+                // On desktop, show QR code modal
+                const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiString)}`;
+                document.getElementById('repayment-qr-container').innerHTML = `<img src="${qrCodeUrl}" alt="UPI QR Code">`;
+                document.getElementById('repayment-booking-id').textContent = bookingId;
+                document.getElementById('repayment-amount').textContent = amount;
+                repaymentModal.classList.remove('hidden');
+                repaymentModal.classList.add('flex');
+            }
+        }
+    });
+
+    repaymentModalClose.addEventListener('click', () => {
+        repaymentModal.classList.add('hidden');
+        repaymentModal.classList.remove('flex');
+    });
+
+    repaymentModal.addEventListener('click', (e) => {
+        if (e.target === repaymentModal) {
+            repaymentModal.classList.add('hidden');
+            repaymentModal.classList.remove('flex');
+        }
+    });
 
     // --- MODAL ELEMENTS ---
     const modal = document.getElementById('booking-modal');
