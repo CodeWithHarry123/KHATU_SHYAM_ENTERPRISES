@@ -6,6 +6,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght @400;500;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="responsive.css" rel="stylesheet"/>
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -111,9 +112,12 @@
 </section>
 <section class="flex flex-col gap-4 px-4">
 <h2 class="text-[#111418] dark:text-white text-3xl font-bold leading-tight tracking-[-0.015em]">About Khatu Shyam Enterprises</h2>
-<p class="text-gray-600 dark:text-gray-300 text-lg font-normal leading-relaxed">
-                                Khatu Shyam Enterprises is committed to providing the most reliable and efficient parcel delivery service. Our mission is to ensure customer satisfaction through timely deliveries and exceptional service. We believe in building lasting relationships with our clients by offering a seamless and hassle-free shipping experience.
-                            </p>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+    <p class="text-gray-600 dark:text-gray-300 text-lg font-normal leading-relaxed">
+        Khatu Shyam Enterprises is committed to providing the most reliable and efficient parcel delivery service. Our mission is to ensure customer satisfaction through timely deliveries and exceptional service. We believe in building lasting relationships with our clients by offering a seamless and hassle-free shipping experience.
+    </p>
+    <img src="https://placehold.co/600x400/1173d4/f6f7f8?text=Fast+Delivery" data-src="https://images.unsplash.com/photo-1586528116311-069241518858?q=80&w=2070&auto=format&fit=crop" alt="A delivery person handling packages in a warehouse" class="rounded-xl shadow-lg"/>
+</div>
 </section>
 <section id="services" class="flex flex-col gap-8 px-4">
 <h2 class="text-[#111418] dark:text-white text-3xl font-bold leading-tight tracking-[-0.015em]">Our Services</h2>

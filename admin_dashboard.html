@@ -9,14 +9,16 @@
     <link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700;800;900&amp;display=swap"
         rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
+    <link href="responsive.css" rel="stylesheet"/>
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <!-- Chart.js for charts -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Firebase Init -->
+    <!-- App Scripts -->
     <script src="firebase-init.js"></script>
+    <script src="admin-analytics.js"></script>
     <script>
         tailwind.config = {
             darkMode: "class",
@@ -125,7 +127,16 @@
                     </div>
 
                     <!-- Stats Cards -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-6">
+                        <div class="bg-white dark:bg-background-dark p-6 rounded-xl shadow-md flex items-center gap-4">
+                            <div class="bg-blue-500/10 p-3 rounded-full">
+                                <span class="material-symbols-outlined text-blue-500 text-3xl">receipt_long</span>
+                            </div>
+                            <div>
+                                <p class="text-gray-500 dark:text-gray-400 text-sm">Total Revenue</p>
+                                <p id="total-revenue" class="text-2xl font-bold">₹0.00</p>
+                            </div>
+                        </div>
                         <div class="bg-white dark:bg-background-dark p-6 rounded-xl shadow-md flex items-center gap-4">
                             <div class="bg-primary/10 p-3 rounded-full">
                                 <span class="material-symbols-outlined text-primary text-3xl">calendar_month</span>
@@ -162,29 +173,30 @@
                                 <p id="total-pending" class="text-2xl font-bold">0</p>
                             </div>
                         </div>
+                        <div class="bg-white dark:bg-background-dark p-6 rounded-xl shadow-md flex items-center gap-4">
+                            <div class="bg-red-500/10 p-3 rounded-full">
+                                <span class="material-symbols-outlined text-red-500 text-3xl">cancel</span>
+                            </div>
+                            <div>
+                                <p class="text-gray-500 dark:text-gray-400 text-sm">Cancelled Bookings</p>
+                                <p id="total-cancelled" class="text-2xl font-bold">0</p>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Charts -->
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                         <div class="bg-white dark:bg-background-dark p-6 rounded-xl shadow-md">
-                            <h2 class="text-lg font-bold mb-4">Bookings Overview</h2>
+                            <canvas id="revenue-chart"></canvas>
+                        </div>
+                        <div class="bg-white dark:bg-background-dark p-6 rounded-xl shadow-md">
+                            <canvas id="routes-chart"></canvas>
+                        </div>
+                        <div class="bg-white dark:bg-background-dark p-6 rounded-xl shadow-md">
                             <canvas id="bookings-chart"></canvas>
                         </div>
                         <div class="bg-white dark:bg-background-dark p-6 rounded-xl shadow-md">
-                            <h2 class="text-lg font-bold mb-4">User Registrations</h2>
                             <canvas id="users-chart"></canvas>
-                        </div>
-                    </div>
-
-                    <!-- Recent Activity -->
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div class="bg-white dark:bg-background-dark p-6 rounded-xl shadow-md">
-                            <h2 class="text-lg font-bold mb-4">Recent Bookings</h2>
-                            <div id="recent-bookings" class="space-y-4"></div>
-                        </div>
-                        <div class="bg-white dark:bg-background-dark p-6 rounded-xl shadow-md">
-                            <h2 class="text-lg font-bold mb-4">New Users</h2>
-                            <div id="recent-users" class="space-y-4"></div>
                         </div>
                     </div>
 
@@ -229,26 +241,22 @@
         // --- AUTHENTICATION ---
         auth.onAuthStateChanged(user => {
             if (user) {
-                // User is logged in, now check for admin status in Firestore.
                 db.collection('users').doc(user.uid).get()
                     .then((doc) => {
-                        if (doc.exists && doc.data().khatu_website_admin) {
-                            // User is an admin, allow access and load data.
+                        if (doc.exists && doc.data().role === 'admin') {
                             console.log("Admin user authenticated successfully.");
-                            loadDashboardData();
+                            loadDashboard();
                         } else {
-                            // User is not an admin, redirect them.
                             console.log("Access Denied: User is not an admin.");
                             showToast("Access Denied. You do not have permission to view this page.", "error");
-                            window.location.href = 'dashboard.html'; // Redirect to dashboard
+                            window.location.href = 'dashboard.html';
                         }
                     })
                     .catch((error) => {
                         console.error("Error getting user document:", error);
-                        window.location.href = 'login.html'; // Redirect on error
+                        window.location.href = 'login.html';
                     });
             } else {
-                // No user is signed in, redirect to login.
                 console.log("No user logged in. Redirecting to login.");
                 window.location.href = 'login.html';
             }
@@ -278,117 +286,18 @@
             document.documentElement.classList.remove('dark');
         }
 
-        // --- DATA LOADING ---
-        function loadDashboardData() {
-            // Load stats
-            db.collection('bookings').onSnapshot(snapshot => {
-                document.getElementById('total-bookings').textContent = snapshot.size;
-                let delivered = 0;
-                let pending = 0;
-                snapshot.forEach(doc => {
-                    if (doc.data().status === 'Delivered') {
-                        delivered++;
-                    } else {
-                        pending++;
-                    }
-                });
-                document.getElementById('total-delivered').textContent = delivered;
-                document.getElementById('total-pending').textContent = pending;
-            });
-
-            db.collection('users').onSnapshot(snapshot => {
-                document.getElementById('total-users').textContent = snapshot.size;
-            });
-
-            // Load recent bookings
-            db.collection('bookings').orderBy('bookingDate', 'desc').limit(5).onSnapshot(snapshot => {
-                const recentBookingsEl = document.getElementById('recent-bookings');
-                recentBookingsEl.innerHTML = '';
-                snapshot.forEach(doc => {
-                    const booking = doc.data();
-                    const bookingDate = booking.bookingDate ? booking.bookingDate.toDate().toLocaleDateString() : 'N/A';
-                    recentBookingsEl.innerHTML += `
-                        <div class="flex justify-between items-center">
-                            <div>
-                                <p class="font-medium">${booking.senderDetails.name}</p>
-                                <p class="text-sm text-gray-500">${booking.bookingId}</p>
-                            </div>
-                            <div class="text-right">
-                                <p class="font-medium">${booking.status}</p>
-                                <p class="text-sm text-gray-500">${bookingDate}</p>
-                            </div>
-                        </div>
-                    `;
-                });
-            });
-
-            // Load recent users
-            db.collection('users').orderBy('createdAt', 'desc').limit(5).onSnapshot(snapshot => {
-                const recentUsersEl = document.getElementById('recent-users');
-                recentUsersEl.innerHTML = '';
-                snapshot.forEach(doc => {
-                    const user = doc.data();
-                    const registrationDate = user.createdAt ? user.createdAt.toDate().toLocaleDateString() : 'N/A';
-                    recentUsersEl.innerHTML += `
-                        <div class="flex justify-between items-center">
-                            <div>
-                                <p class="font-medium">${user.name || 'N/A'}</p>
-                                <p class="text-sm text-gray-500">${user.phoneNumber}</p>
-                            </div>
-                            <p class="text-sm text-gray-500">${registrationDate}</p>
-                        </div>
-                    `;
-                });
-            });
-
-            // Bookings Chart
-            const bookingsCtx = document.getElementById('bookings-chart').getContext('2d');
-            const bookingsChart = new Chart(bookingsCtx, {
-                type: 'bar',
-                data: {
-                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-                    datasets: [{
-                        label: 'Bookings',
-                        data: [12, 19, 3, 5, 2, 3],
-                        backgroundColor: 'rgba(26, 58, 109, 0.8)',
-                        borderColor: 'rgba(26, 58, 109, 1)',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    scales: {
-                        y: {
-                            beginAtZero: true
-                        }
-                    }
-                }
-            });
-
-            // Users Chart
-            const usersCtx = document.getElementById('users-chart').getContext('2d');
-            const usersChart = new Chart(usersCtx, {
-                type: 'line',
-                data: {
-                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-                    datasets: [{
-                        label: 'New Users',
-                        data: [5, 10, 15, 12, 20, 18],
-                        backgroundColor: 'rgba(255, 193, 7, 0.2)',
-                        borderColor: 'rgba(255, 193, 7, 1)',
-                        borderWidth: 2,
-                        tension: 0.4
-                    }]
-                },
-                options: {
-                    scales: {
-                        y: {
-                            beginAtZero: true
-                        }
-                    }
-                }
-            });
-
+        // --- DASHBOARD LOADING ---
+        async function loadDashboard() {
+            const analytics = new AdminAnalytics();
+            try {
+                const data = await analytics.getDashboardData();
+                analytics.renderDashboard(data);
+            } catch (error) {
+                console.error("Error loading dashboard data:", error);
+                showToast("Could not load dashboard data.", "error");
+            }
         }
+
     </script>
 </body>
 

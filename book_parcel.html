@@ -12,8 +12,16 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-    <!-- Firebase Init -->
+    <!-- Google Maps API (for Price Calculator) -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY"></script>
+    <!-- App Scripts -->
     <script src="firebase-init.js"></script>
+    <script src="input-validator.js"></script>
+    <script src="payment-gateway.js"></script>
+    <script src="price-calculator.js"></script>
+    <script src="rate-limiter.js"></script>
+    <link href="toast.css" rel="stylesheet"/>
+    <script src="error-handler.js"></script>
 <script>
         tailwind.config = {
             darkMode: "class",
@@ -156,6 +164,19 @@
 </label>
 </div>
 </section>
+
+<!-- Price Calculator Section -->
+<section id="price-calculator-section" class="space-y-6">
+    <h2 class="text-2xl font-bold leading-tight tracking-[-0.015em] text-primary border-b border-[#f0f2f4] dark:border-gray-700 pb-3">Shipping Estimate</h2>
+    <div class="flex items-center gap-4">
+        <button id="calculate-price-button" type="button" class="flex items-center justify-center gap-2 rounded-lg bg-gray-200 dark:bg-gray-700 px-6 py-3 text-center text-base font-bold text-gray-800 dark:text-white shadow-sm transition-all hover:bg-gray-300 dark:hover:bg-gray-600">
+            <span>Calculate Price</span>
+            <span class="material-symbols-outlined">calculate</span>
+        </button>
+        <div id="price-breakdown" class="text-lg font-medium"></div>
+    </div>
+</section>
+
 <!-- Payment Method Section -->
 <section class="space-y-6">
 <h2 class="text-2xl font-bold leading-tight tracking-[-0.015em] text-primary border-b border-[#f0f2f4] dark:border-gray-700 pb-3">Payment Method</h2>
@@ -189,46 +210,15 @@
 </div>
 </div>
 </div>
-<script>
-    // 1. Toast Notification Function
-    function showToast(message, type = 'info') {
-        const container = document.getElementById('toast-container');
-        if (!container) return;
-
-        const colors = {
-            success: 'bg-green-500',
-            error: 'bg-red-500',
-            warning: 'bg-yellow-500',
-            info: 'bg-blue-500'
-        };
-        const icons = {
-            success: '✓',
-            error: '✗',
-            warning: '⚠',
-            info: 'ℹ'
-        };
-
-        const toast = document.createElement('div');
-        toast.className = `${colors[type]} text-white px-6 py-4 rounded-lg shadow-lg flex items-center space-x-3 animate-slide-in`;
-        toast.innerHTML = `
-            <span class="text-2xl">${icons[type]}</span>
-            <span class="font-medium">${message}</span>
-            <button onclick="this.parentElement.remove()" class="ml-4 text-white hover:text-gray-200">✕</button>
-        `;
-
-        container.appendChild(toast);
-
-        setTimeout(() => {
-            toast.classList.add('animate-slide-out');
-            setTimeout(() => toast.remove(), 300);
-        }, 5000);
-    }
+'''<script>
+    let bookingAmount = 100; // Default amount
 
     // 2. Auth State Listener (for auto-filling form)
-    auth.onAuthStateChanged(user => {
+    auth.onAuthStateChanged(async (user) => {
         if (user) {
-            const userRef = db.collection('users').doc(user.uid);
-            userRef.get().then(doc => {
+            try {
+                const userRef = db.collection('users').doc(user.uid);
+                const doc = await userRef.get();
                 if (doc.exists) {
                     const userData = doc.data();
                     document.getElementById('sender-name').value = userData.name || '';
@@ -238,9 +228,11 @@
                     document.getElementById('sender-address').value = userData.address || '';
                     document.getElementById('sender-pincode').value = userData.pincode || '';
                 }
-            });
+            } catch (error) {
+                ErrorHandler.handleFirebaseError(error);
+            }
         } else {
-            showToast('You must be logged in to book a parcel.', 'error');
+            ErrorHandler.show('You must be logged in to book a parcel.', 'error');
             setTimeout(() => { window.location.href = 'login.html'; }, 2000);
         }
     });
@@ -253,52 +245,129 @@
         });
     }
 
+    const paymentGateway = new PaymentGateway();
+    const priceCalculator = new PriceCalculator();
+
+    // Price Calculation Logic
+    document.getElementById('calculate-price-button').addEventListener('click', async () => {
+        const pickupPincode = document.getElementById('sender-pincode').value;
+        const deliveryPincode = document.getElementById('receiver-pincode').value;
+        const weight = parseFloat(document.getElementById('parcel-weight').value);
+
+        if (!pickupPincode || !deliveryPincode || !weight) {
+            ErrorHandler.show('Please enter Sender & Receiver PIN codes and Parcel Weight to calculate the price.', 'warning');
+            return;
+        }
+
+        const priceBreakdownDiv = document.getElementById('price-breakdown');
+        priceBreakdownDiv.innerHTML = 'Calculating...';
+
+        try {
+            const pricing = await priceCalculator.calculatePrice(pickupPincode, deliveryPincode, weight);
+            if (pricing) {
+                priceBreakdownDiv.innerHTML = `
+                    <p>Distance: ${pricing.distance} km</p>
+                    <p>Base Price: ₹${pricing.basePrice}</p>
+                    <p>GST (18%): ₹${pricing.gst}</p>
+                    <h4 class="font-bold">Total: ₹${pricing.total}</h4>
+                `;
+                bookingAmount = parseFloat(pricing.total);
+            } else {
+                priceBreakdownDiv.innerHTML = 'Could not calculate price. Please check PIN codes.';
+                ErrorHandler.show('Could not calculate price. Please check PIN codes.', 'error');
+            }
+        } catch (error) {
+            priceBreakdownDiv.innerHTML = 'Error in price calculation.';
+            ErrorHandler.show(error.message || 'An error occurred during price calculation.', 'error');
+        }
+    });
+
+    const limiter = new RateLimiter(5, 60000); // 5 requests per minute
+
     // 4. Main Form Submission Logic
-    document.getElementById('booking-form').addEventListener('submit', async function(event) {
+    document.getElementById('booking-form').addEventListener('submit', function(event) {
         event.preventDefault();
 
         const user = auth.currentUser;
         if (!user) {
-            showToast("You must be logged in to book a parcel.", "error");
+            ErrorHandler.show("You must be logged in to book a parcel.", "error");
             return;
         }
 
-        const bookingId = `KS-${Date.now()}`;
-        const amount = (parseFloat(document.getElementById('parcel-weight').value) * 50) || 100; // Example amount
+        const userId = user.uid;
 
-        const bookingData = {
-            userId: user.uid,
-            bookingId: bookingId,
-            senderDetails: {
-                name: document.getElementById('sender-name').value,
-                mobile: document.getElementById('sender-mobile').value,
-                address: document.getElementById('sender-address').value,
-                pincode: document.getElementById('sender-pincode').value,
-            },
-            receiverDetails: {
-                name: document.getElementById('receiver-name').value,
-                mobile: document.getElementById('receiver-mobile').value,
-                address: document.getElementById('receiver-address').value,
-                pincode: document.getElementById('receiver-pincode').value,
-            },
-            parcelDetails: {
-                weight: document.getElementById('parcel-weight').value,
-                size: document.getElementById('parcel-size').value,
-                type: document.getElementById('parcel-type').value,
-            },
-            bookingDate: firebase.firestore.FieldValue.serverTimestamp(),
-            status: 'Booked',
-            amount: amount,
-            paymentMethod: document.querySelector('input[name="payment"]:checked').value,
-            paymentStatus: 'pending'
-        };
+        limiter.handleRequest(userId, async () => {
+            // --- Input Validation and Sanitization ---
+            const senderName = InputValidator.sanitizeInput(document.getElementById('sender-name').value);
+            const senderMobile = document.getElementById('sender-mobile').value;
+            const senderAddress = InputValidator.sanitizeInput(document.getElementById('sender-address').value);
+            const senderPincode = document.getElementById('sender-pincode').value;
 
-        if (bookingData.paymentMethod === 'online') {
-            await initiatePayment(bookingData);
-        } else { // Cash on Shipping
-            bookingData.paymentStatus = 'cos';
-            await saveBooking(bookingData);
-        }
+            const receiverName = InputValidator.sanitizeInput(document.getElementById('receiver-name').value);
+            const receiverMobile = document.getElementById('receiver-mobile').value;
+            const receiverAddress = InputValidator.sanitizeInput(document.getElementById('receiver-address').value);
+            const receiverPincode = document.getElementById('receiver-pincode').value;
+
+            const parcelWeight = document.getElementById('parcel-weight').value;
+
+            if (!senderName || !senderAddress || !receiverName || !receiverAddress || !parcelWeight) {
+                ErrorHandler.show('Please fill out all required fields.', 'error');
+                return;
+            }
+            if (!InputValidator.validatePhone(senderMobile)) {
+                ErrorHandler.show('Invalid Sender Mobile Number.', 'error');
+                return;
+            }
+            if (!InputValidator.validatePincode(senderPincode)) {
+                ErrorHandler.show('Invalid Sender PIN Code.', 'error');
+                return;
+            }
+            if (!InputValidator.validatePhone(receiverMobile)) {
+                ErrorHandler.show('Invalid Receiver Mobile Number.', 'error');
+                return;
+            }
+            if (!InputValidator.validatePincode(receiverPincode)) {
+                ErrorHandler.show('Invalid Receiver PIN Code.', 'error');
+                return;
+            }
+
+
+            const bookingId = `KS-${Date.now()}`;
+
+            const bookingData = {
+                userId: user.uid,
+                bookingId: bookingId,
+                senderDetails: {
+                    name: senderName,
+                    mobile: senderMobile,
+                    address: senderAddress,
+                    pincode: senderPincode,
+                },
+                receiverDetails: {
+                    name: receiverName,
+                    mobile: receiverMobile,
+                    address: receiverAddress,
+                    pincode: receiverPincode,
+                },
+                parcelDetails: {
+                    weight: parcelWeight,
+                    size: InputValidator.sanitizeInput(document.getElementById('parcel-size').value),
+                    type: document.getElementById('parcel-type').value,
+                },
+                bookingDate: firebase.firestore.FieldValue.serverTimestamp(),
+                status: 'Booked',
+                amount: bookingAmount,
+                paymentMethod: document.querySelector('input[name="payment"]:checked').value,
+                paymentStatus: 'pending'
+            };
+
+            if (bookingData.paymentMethod === 'online') {
+                await paymentGateway.initiatePayment(bookingData);
+            } else { // Cash on Shipping
+                bookingData.paymentStatus = 'cos';
+                await saveBooking(bookingData);
+            }
+        });
     });
 
     // 5. saveBooking Helper Function
@@ -306,79 +375,11 @@
         try {
             const docRef = await db.collection("bookings").add(bookingData);
             console.log("Document written with ID: ", docRef.id);
-            showToast(`Booking successful! Your Booking ID is ${bookingData.bookingId}`, 'success');
+            ErrorHandler.show(`Booking successful! Your Booking ID is ${bookingData.bookingId}`, 'success');
             setTimeout(() => { window.location.href = 'dashboard.html'; }, 3000);
         } catch (error) {
-            console.error("Error adding document: ", error);
-            showToast("There was an error with your booking. Please try again.", "error");
+            ErrorHandler.handleFirebaseError(error);
         }
     }
-
-    // 6. initiatePayment Function (with Razorpay and Cloud Function)
-    async function initiatePayment(bookingData) {
-        showToast('Initializing payment...', 'info');
-
-        // VERY IMPORTANT: Replace this placeholder with the actual URL from your Firebase deployment
-        const cloudFunctionUrl = 'PASTE_YOUR_CLOUD_FUNCTION_URL_HERE';
-
-        try {
-            const orderResponse = await fetch(cloudFunctionUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ amount: bookingData.amount })
-            });
-
-            if (!orderResponse.ok) {
-                throw new Error('Failed to create Razorpay order.');
-            }
-
-            const order = await orderResponse.json();
-
-            const user = auth.currentUser;
-            const userDoc = await db.collection('users').doc(user.uid).get();
-            const userData = userDoc.exists ? userDoc.data() : {};
-
-            const options = {
-                key: 'rzp_test_RYFI1lMqR1SvDA',
-                amount: order.amount,
-                currency: order.currency,
-                name: 'Khatu Shyam Enterprises',
-                description: 'Parcel Booking Payment',
-                order_id: order.id,
-                handler: async function(response) {
-                    bookingData.paymentStatus = 'paid';
-                    bookingData.paymentId = response.razorpay_payment_id;
-                    bookingData.razorpayOrderId = response.razorpay_order_id;
-                    bookingData.razorpaySignature = response.razorpay_signature;
-                    bookingData.paidAt = firebase.firestore.FieldValue.serverTimestamp();
-                    
-                    showToast('Payment successful! Saving booking...', 'success');
-                    await saveBooking(bookingData);
-                },
-                prefill: {
-                    name: userData.name || '',
-                    email: userData.email || '',
-                    contact: user.phoneNumber
-                },
-                theme: {
-                    color: '#1173d4'
-                },
-                modal: {
-                    ondismiss: function(){
-                        showToast('Payment cancelled.', 'warning');
-                    }
-                }
-            };
-
-            const razorpay = new Razorpay(options);
-            razorpay.open();
-
-        } catch (error) {
-            console.error('Payment Initialization Error:', error);
-            showToast('Could not initiate payment. Please try again.', 'error');
-        }
-    }
-</script>
+</script>'''
 </body></html>

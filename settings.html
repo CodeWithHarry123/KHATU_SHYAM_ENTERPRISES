@@ -9,12 +9,16 @@
     <link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700;800;900&amp;display=swap"
         rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
+    <link href="responsive.css" rel="stylesheet"/>
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <!-- Firebase Init -->
     <script src="firebase-init.js"></script>
+    <script src="backup-system.js"></script>
+    <link href="toast.css" rel="stylesheet"/>
+    <script src="error-handler.js"></script>
     <script>
         tailwind.config = {
             darkMode: "class",
@@ -199,7 +203,21 @@
 
                             <div id="security" class="tab-content hidden bg-white dark:bg-background-dark p-6 rounded-xl shadow-md">
                                 <h2 class="text-xl font-bold mb-6">Security Settings</h2>
-                                <p>This is a placeholder for security settings.</p>
+                                <div class="space-y-6">
+                                    <h3 class="text-lg font-bold">Data Backup & Export</h3>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">Export all your critical data (bookings, users, etc.) to a JSON file as a backup. You can import this file later to restore the data.</p>
+                                    <div class="flex flex-col sm:flex-row gap-4">
+                                        <button id="export-data-button" class="flex items-center justify-center gap-2 w-full sm:w-auto rounded-lg bg-primary px-6 py-3 text-center text-base font-bold text-white shadow-sm transition-all hover:bg-primary/90">
+                                            <span class="material-symbols-outlined">download</span>
+                                            <span>Export All Data</span>
+                                        </button>
+                                        <label class="flex items-center justify-center gap-2 w-full sm:w-auto rounded-lg bg-gray-200 dark:bg-gray-700 px-6 py-3 text-center text-base font-bold text-gray-800 dark:text-white shadow-sm transition-all hover:bg-gray-300 dark:hover:bg-gray-600 cursor-pointer">
+                                            <span class="material-symbols-outlined">upload</span>
+                                            <span>Import Data</span>
+                                            <input type="file" id="import-data-input" class="hidden" accept=".json">
+                                        </label>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -207,99 +225,103 @@
             </main>
         </div>
     </div>
-    <script>
-        // --- AUTHENTICATION ---
-        auth.onAuthStateChanged(user => {
-            if (user) {
-                // User is logged in, now check for admin status in Firestore.
-                db.collection('users').doc(user.uid).get()
-                    .then((doc) => {
-                        if (doc.exists && doc.data().khatu_website_admin) {
-                            // User is an admin, allow access and load data.
+        <script>
+            // --- AUTHENTICATION ---
+            auth.onAuthStateChanged(async (user) => {
+                if (user) {
+                    try {
+                        const userDoc = await db.collection('users').doc(user.uid).get();
+                        if (userDoc.exists && userDoc.data().khatu_website_admin) {
                             console.log("Admin user authenticated successfully.");
                         } else {
-                            // User is not an admin, redirect them.
-                            console.log("Access Denied: User is not an admin.");
-                            alert("Access Denied. You do not have permission to view this page.");
-                            window.location.href = 'dashboard.html'; // Redirect to dashboard
+                            ErrorHandler.show("Access Denied. You do not have permission to view this page.", "error");
+                            window.location.href = 'dashboard.html';
                         }
-                    })
-                    .catch((error) => {
-                        console.error("Error getting user document:", error);
-                        window.location.href = 'login.html'; // Redirect on error
-                    });
-            } else {
-                // No user is signed in, redirect to login.
-                console.log("No user logged in. Redirecting to login.");
-                window.location.href = 'login.html';
-            }
-        });
-
-        // --- UI ELEMENTS ---
-        const logoutButton = document.getElementById('logout-button');
-        const sidebar = document.getElementById('sidebar');
-        const sidebarToggle = document.getElementById('sidebar-toggle');
-        const tabButtons = document.querySelectorAll('.tab-button');
-        const tabContents = document.querySelectorAll('.tab-content');
-        const darkModeToggle = document.getElementById('dark-mode-toggle');
-
-        // --- EVENT LISTENERS ---
-        sidebarToggle.addEventListener('click', () => {
-            sidebar.classList.toggle('-translate-x-full');
-        });
-
-        logoutButton.addEventListener('click', (e) => {
-            e.preventDefault();
-            auth.signOut().then(() => {
-                window.location.href = 'index.html';
-            });
-        });
-
-        tabButtons.forEach(button => {
-            button.addEventListener('click', () => {
-                // Deactivate all buttons and hide all content
-                tabButtons.forEach(btn => btn.classList.remove('active', 'bg-primary/10', 'text-primary'));
-                tabContents.forEach(content => content.classList.add('hidden'));
-
-                // Activate the clicked button and show its content
-                button.classList.add('active', 'bg-primary/10', 'text-primary');
-                document.getElementById(button.dataset.tab).classList.remove('hidden');
-            });
-        });
-        
-        // Dark Mode Toggle
-        if (localStorage.getItem('color-theme') === 'dark') {
-            document.documentElement.classList.add('dark');
-            darkModeToggle.checked = true;
-        } else {
-            document.documentElement.classList.remove('dark')
-            darkModeToggle.checked = false;
-        }
-
-        darkModeToggle.addEventListener('change', function() {
-            // if set via local storage previously
-            if (localStorage.getItem('color-theme')) {
-                if (localStorage.getItem('color-theme') === 'light') {
-                    document.documentElement.classList.add('dark');
-                    localStorage.setItem('color-theme', 'dark');
+                    } catch (error) {
+                        ErrorHandler.handleFirebaseError(error);
+                        window.location.href = 'login.html';
+                    }
                 } else {
-                    document.documentElement.classList.remove('dark');
-                    localStorage.setItem('color-theme', 'light');
+                    console.log("No user logged in. Redirecting to login.");
+                    window.location.href = 'login.html';
                 }
-
-            // if NOT set via local storage previously
+            });
+    
+            // --- UI ELEMENTS ---
+            const logoutButton = document.getElementById('logout-button');
+            const sidebar = document.getElementById('sidebar');
+            const sidebarToggle = document.getElementById('sidebar-toggle');
+            const tabButtons = document.querySelectorAll('.tab-button');
+            const tabContents = document.querySelectorAll('.tab-content');
+            const darkModeToggle = document.getElementById('dark-mode-toggle');
+    
+            // --- EVENT LISTENERS ---
+            sidebarToggle.addEventListener('click', () => {
+                sidebar.classList.toggle('-translate-x-full');
+            });
+    
+            logoutButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                auth.signOut().then(() => {
+                    window.location.href = 'index.html';
+                });
+            });
+    
+            tabButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    tabButtons.forEach(btn => btn.classList.remove('active', 'bg-primary/10', 'text-primary'));
+                    tabContents.forEach(content => content.classList.add('hidden'));
+                    button.classList.add('active', 'bg-primary/10', 'text-primary');
+                    document.getElementById(button.dataset.tab).classList.remove('hidden');
+                });
+            });
+            
+            // Dark Mode Toggle
+            if (localStorage.getItem('color-theme') === 'dark') {
+                document.documentElement.classList.add('dark');
+                darkModeToggle.checked = true;
             } else {
-                if (document.documentElement.classList.contains('dark')) {
-                    document.documentElement.classList.remove('dark');
-                    localStorage.setItem('color-theme', 'light');
-                } else {
-                    document.documentElement.classList.add('dark');
-                    localStorage.setItem('color-theme', 'dark');
-                }
+                document.documentElement.classList.remove('dark')
+                darkModeToggle.checked = false;
             }
-        });
-
-    </script>
-</body>
+    
+            darkModeToggle.addEventListener('change', function() {
+                if (localStorage.getItem('color-theme')) {
+                    if (localStorage.getItem('color-theme') === 'light') {
+                        document.documentElement.classList.add('dark');
+                        localStorage.setItem('color-theme', 'dark');
+                    } else {
+                        document.documentElement.classList.remove('dark');
+                        localStorage.setItem('color-theme', 'light');
+                    }
+                } else {
+                    if (document.documentElement.classList.contains('dark')) {
+                        document.documentElement.classList.remove('dark');
+                        localStorage.setItem('color-theme', 'light');
+                    } else {
+                        document.documentElement.classList.add('dark');
+                        localStorage.setItem('color-theme', 'dark');
+                    }
+                }
+            });
+    
+            // --- BACKUP & RESTORE ---
+            const backupSystem = new BackupSystem();
+            const exportButton = document.getElementById('export-data-button');
+            const importInput = document.getElementById('import-data-input');
+    
+            exportButton.addEventListener('click', () => {
+                backupSystem.exportAllData();
+            });
+    
+            importInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    if (confirm('Are you sure you want to import data? This will overwrite existing data and cannot be undone.')) {
+                        backupSystem.importData(file);
+                    }
+                }
+            });
+        </script></body>
 
 </html>

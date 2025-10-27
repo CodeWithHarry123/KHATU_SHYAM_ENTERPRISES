@@ -7,12 +7,15 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght @400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+    <link href="loading-skeleton.css" rel="stylesheet"/>
+    <link href="toast.css" rel="stylesheet"/>
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <!-- Firebase Init -->
     <script src="firebase-init.js"></script>
+    <script src="error-handler.js"></script>
 <script>
         tailwind.config = {
             darkMode: "class",
@@ -60,19 +63,7 @@
         .animate-slide-out { animation: slide-out 0.3s ease-in; }
     </style>
 </head>
-<body class="bg-background-light dark:bg-background-dark font-display">
-<div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
-<!-- Loading overlay HTML -->
-<div id="loading-overlay" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white rounded-lg p-8 flex flex-col items-center">
-        <svg class="animate-spin h-12 w-12 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-        <p class="mt-4 text-gray-700 font-medium">Loading...</p>
-    </div>
-</div>
-<div class="relative flex h-auto min-h-screen w-full flex-col group/design-root overflow-x-hidden">
+<body class="bg-background-light dark:bg-background-dark font-display"><div class="relative flex h-auto min-h-screen w-full flex-col group/design-root overflow-x-hidden">
 <div class="layout-container flex h-full grow flex-col">
 <header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-gray-200 dark:border-gray-700 px-4 sm:px-10 py-3 bg-white dark:bg-background-dark">
     <div class="flex items-center gap-4 text-primary">
@@ -240,53 +231,34 @@
         .bg-booked\/20 { background-color: rgba(33, 150, 243, 0.2); }
     </style>
 <script>
-    function showToast(message, type = 'info') {
-        const container = document.getElementById('toast-container');
-        if (!container) return;
+    function showBookingSkeleton() {
+        const skeletonRow = `
+            <tr>
+                <td class="px-6 py-4"><div class="skeleton skeleton-text w-3/4"></div></td>
+                <td class="px-6 py-4"><div class="skeleton skeleton-text w-1/2"></div></td>
+                <td class="px-6 py-4"><div class="skeleton skeleton-text w-full"></div></td>
+                <td class="px-6 py-4"><div class="skeleton skeleton-text w-20 h-6 rounded-full"></div></td>
+                <td class="px-6 py-4"><div class="skeleton skeleton-text w-1/2"></div></td>
+                <td class="px-6 py-4"><div class="skeleton skeleton-text w-24 h-6"></div></td>
+            </tr>
+        `.repeat(5);
 
-        const colors = {
-            success: 'bg-green-500',
-            error: 'bg-red-500',
-            warning: 'bg-yellow-500',
-            info: 'bg-blue-500'
-        };
-        const icons = {
-            success: '✓',
-            error: '✗',
-            warning: '⚠',
-            info: 'ℹ'
-        };
+        const skeletonCard = `
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 space-y-3">
+                <div class="flex justify-between items-start">
+                    <div class="skeleton skeleton-text w-1/4"></div>
+                    <div class="skeleton skeleton-text w-20 h-6 rounded-full"></div>
+                </div>
+                <div class="space-y-2">
+                    <div class="skeleton skeleton-text w-full"></div>
+                    <div class="skeleton skeleton-text w-1/2"></div>
+                </div>
+                <div class="skeleton skeleton-text w-1/3 mt-2"></div>
+            </div>
+        `.repeat(4);
 
-        const toast = document.createElement('div');
-        toast.className = `${colors[type]} text-white px-6 py-4 rounded-lg shadow-lg flex items-center space-x-3 animate-slide-in`;
-        toast.innerHTML = `
-            <span class="text-2xl">${icons[type]}</span>
-            <span class="font-medium">${message}</span>
-            <button onclick="this.parentElement.remove()" class="ml-4 text-white hover:text-gray-200">✕</button>
-        `;
-
-        container.appendChild(toast);
-
-        setTimeout(() => {
-            toast.classList.add('animate-slide-out');
-            setTimeout(() => toast.remove(), 300);
-        }, 5000);
-    }
-
-    // Loading functions
-    function showLoading(message = 'Loading...') {
-        const overlay = document.getElementById('loading-overlay');
-        if (overlay) {
-            overlay.querySelector('p').textContent = message;
-            overlay.classList.remove('hidden');
-        }
-    }
-
-    function hideLoading() {
-        const overlay = document.getElementById('loading-overlay');
-        if (overlay) {
-            overlay.classList.add('hidden');
-        }
+        bookingsTableBody.innerHTML = skeletonRow;
+        bookingsCardView.innerHTML = skeletonCard;
     }
 
     // --- GLOBAL STATE ---
@@ -312,12 +284,13 @@
                 return;
             }
 
-            showLoading('Authenticating...');
+            showBookingSkeleton(); // Show skeleton UI immediately
+
             try {
                 const userDoc = await db.collection('users').doc(user.uid).get();
 
                 if (!userDoc.exists) {
-                    showToast('User data not found. Please contact support.', 'error');
+                    ErrorHandler.show('User data not found. Please contact support.', 'error');
                     auth.signOut();
                     window.location.href = 'login.html';
                     return;
@@ -326,10 +299,7 @@
                 const userData = userDoc.data();
                 console.log('User logged in:', userData);
 
-                if (userData.khatu_website_admin === true) {
-                    window.location.href = 'admin_dashboard.html';
-                    return;
-                }
+
 
                 if (!userData.name || !userData.address) {
                     const profileUpdateModal = document.getElementById('profile-update-modal');
@@ -342,15 +312,12 @@
                 await loadBookings(user.uid);
 
             } catch (error) {
-                console.error('Error loading user data:', error);
-                showToast('Error loading dashboard. Please try again.', 'error');
-                hideLoading();
+                ErrorHandler.handleFirebaseError(error);
             }
         });
     });
 
     async function loadBookings(userId) {
-        showLoading('Fetching your bookings...');
         try {
             const querySnapshot = await db.collection('bookings').where('userId', '==', userId).orderBy('bookingDate', 'desc').get();
             allBookings = [];
@@ -359,12 +326,10 @@
             });
             applyFiltersAndSearch();
         } catch (error) {
-            console.error("Error getting documents: ", error);
+            ErrorHandler.handleFirebaseError(error);
             const errorHtml = `<div class="text-center py-10 text-red-500 col-span-full">Error loading bookings.</div>`;
-            bookingsTableBody.innerHTML = `<tr><td colspan="5" class="text-center py-10 text-red-500">Error loading bookings.</td></tr>`;
+            bookingsTableBody.innerHTML = `<tr><td colspan="6" class="text-center py-10 text-red-500">Error loading bookings.</td></tr>`;
             bookingsCardView.innerHTML = errorHtml;
-        } finally {
-            hideLoading();
         }
     }
 
@@ -484,7 +449,7 @@
             const amount = repayBtn.dataset.amount;
 
             if (!bookingId || !amount || amount === '0') {
-                showToast('Could not initiate payment. Amount is zero or data is missing.', 'error');
+                ErrorHandler.show('Could not initiate payment. Amount is zero or data is missing.', 'error');
                 return;
             }
 

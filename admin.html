@@ -9,6 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700;800;900&amp;display=swap"
         rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
+    <link href="responsive.css" rel="stylesheet"/>
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -131,7 +132,7 @@
                                     class="text-gray-500 dark:text-gray-400 flex border-none bg-white dark:bg-background-dark items-center justify-center pl-4 rounded-l-lg border-r-0">
                                     <span class="material-symbols-outlined">search</span>
                                 </div>
-                                <input
+                                <input id="search-input"
                                     class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-r-lg text-text-light dark:text-text-dark focus:outline-0 focus:ring-2 focus:ring-primary/50 border-gray-300 dark:border-gray-600 bg-white dark:bg-background-dark h-full placeholder:text-gray-400 px-4 text-base font-normal"
                                     placeholder="Search by customer name, booking ID, etc." value="" />
                             </div>
@@ -229,6 +230,7 @@
         const modalContent = document.getElementById('modal-content');
         const modalBody = document.getElementById('modal-body');
         const modalCloseButton = document.getElementById('modal-close-button');
+        const searchInput = document.getElementById('search-input');
 
         let allBookingsData = [];
 
@@ -321,6 +323,24 @@
             }
         });
 
+        searchInput.addEventListener('input', () => {
+            const searchTerm = searchInput.value.toLowerCase().trim();
+            const filteredBookings = allBookingsData.filter(booking => {
+                const customerName = (booking.senderDetails.name || '').toLowerCase();
+                const bookingId = (booking.bookingId || '').toLowerCase();
+                const senderPincode = (booking.senderDetails.pincode || '').toLowerCase();
+                const receiverPincode = (booking.receiverDetails.pincode || '').toLowerCase();
+                const status = (booking.status || '').toLowerCase();
+
+                return customerName.includes(searchTerm) ||
+                       bookingId.includes(searchTerm) ||
+                       senderPincode.includes(searchTerm) ||
+                       receiverPincode.includes(searchTerm) ||
+                       status.includes(searchTerm);
+            });
+            renderBookings(filteredBookings);
+        });
+
         // Dark Mode Check
         if (localStorage.getItem('color-theme') === 'dark') {
             document.documentElement.classList.add('dark');
@@ -391,61 +411,65 @@
             }
         }
 
+        function renderBookings(bookings) {
+            bookingsTableBody.innerHTML = '';
+            bookingsCardView.innerHTML = '';
+
+            if (bookings.length === 0) {
+                const noDataHtml = `<p class="text-center py-10 col-span-full">No bookings match your criteria.</p>`;
+                bookingsTableBody.innerHTML = `<tr><td colspan="7">${noDataHtml}</td></tr>`;
+                bookingsCardView.innerHTML = noDataHtml;
+                return;
+            }
+
+            bookings.forEach((booking) => {
+                const bookingDate = booking.bookingDate ? booking.bookingDate.toDate().toLocaleDateString() : 'N/A';
+                const statusClass = getStatusClass(booking.status);
+
+                // --- Create Desktop Table Row ---
+                const tableRow = `
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-800">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${booking.bookingId || 'N/A'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-text-light dark:text-text-dark">${booking.senderDetails.name || 'N/A'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${booking.senderDetails.pincode}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${booking.receiverDetails.pincode}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${bookingDate}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${statusClass}">${booking.status || 'N/A'}</span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            <button class="view-booking-button font-medium text-primary dark:text-secondary hover:underline" data-booking-id="${booking.id}">View</button>
+                        </td>
+                    </tr>`;
+                bookingsTableBody.innerHTML += tableRow;
+
+                // --- Create Mobile Card ---
+                const card = `
+                    <div class="view-booking-button bg-white dark:bg-gray-800 rounded-lg shadow p-4 space-y-3 cursor-pointer hover:shadow-md transition-shadow" data-booking-id="${booking.id}">
+                        <div class="flex justify-between items-start">
+                            <div class="font-bold text-primary dark:text-secondary">${booking.bookingId || 'N/A'}</div>
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${statusClass}">${booking.status || 'N/A'}</span>
+                        </div>
+                        <div class="text-sm">
+                            <p class="font-medium text-gray-800 dark:text-gray-200">${booking.senderDetails.name}</p>
+                            <p class="text-gray-500 dark:text-gray-400">From: ${booking.senderDetails.pincode} ⟶ To: ${booking.receiverDetails.pincode}</p>
+                        </div>
+                        <div class="text-xs text-gray-400 dark:text-gray-500 pt-2 border-t border-gray-200 dark:border-gray-700">
+                            Booked on: ${bookingDate}
+                        </div>
+                    </div>`;
+                bookingsCardView.innerHTML += card;
+            });
+        }
+
         function loadAllBookings() {
             db.collection('bookings').orderBy('bookingDate', 'desc').get()
                 .then((querySnapshot) => {
-                    bookingsTableBody.innerHTML = '';
-                    bookingsCardView.innerHTML = '';
                     allBookingsData = [];
-
-                    if (querySnapshot.empty) {
-                        const noDataHtml = `<p class="text-center py-10 col-span-full">No bookings found.</p>`;
-                        bookingsTableBody.innerHTML = `<tr><td colspan="7">${noDataHtml}</td></tr>`;
-                        bookingsCardView.innerHTML = noDataHtml;
-                        return;
-                    }
-
                     querySnapshot.forEach((doc) => {
-                        const booking = { id: doc.id, ...doc.data() };
-                        allBookingsData.push(booking);
-
-                        const bookingDate = booking.bookingDate ? booking.bookingDate.toDate().toLocaleDateString() : 'N/A';
-                        const statusClass = getStatusClass(booking.status);
-
-                        // --- Create Desktop Table Row ---
-                        const tableRow = `
-                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-800">
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${booking.bookingId || 'N/A'}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-text-light dark:text-text-dark">${booking.senderDetails.name || 'N/A'}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${booking.senderDetails.pincode}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${booking.receiverDetails.pincode}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${bookingDate}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm">
-                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${statusClass}">${booking.status || 'N/A'}</span>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm">
-                                    <button class="view-booking-button font-medium text-primary dark:text-secondary hover:underline" data-booking-id="${booking.id}">View</button>
-                                </td>
-                            </tr>`;
-                        bookingsTableBody.innerHTML += tableRow;
-
-                        // --- Create Mobile Card ---
-                        const card = `
-                            <div class="view-booking-button bg-white dark:bg-gray-800 rounded-lg shadow p-4 space-y-3 cursor-pointer hover:shadow-md transition-shadow" data-booking-id="${booking.id}">
-                                <div class="flex justify-between items-start">
-                                    <div class="font-bold text-primary dark:text-secondary">${booking.bookingId || 'N/A'}</div>
-                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${statusClass}">${booking.status || 'N/A'}</span>
-                                </div>
-                                <div class="text-sm">
-                                    <p class="font-medium text-gray-800 dark:text-gray-200">${booking.senderDetails.name}</p>
-                                    <p class="text-gray-500 dark:text-gray-400">From: ${booking.senderDetails.pincode} ⟶ To: ${booking.receiverDetails.pincode}</p>
-                                </div>
-                                <div class="text-xs text-gray-400 dark:text-gray-500 pt-2 border-t border-gray-200 dark:border-gray-700">
-                                    Booked on: ${bookingDate}
-                                </div>
-                            </div>`;
-                        bookingsCardView.innerHTML += card;
+                        allBookingsData.push({ id: doc.id, ...doc.data() });
                     });
+                    renderBookings(allBookingsData);
                 })
                 .catch((error) => {
                     console.error("Error getting documents: ", error);
