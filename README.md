@@ -1,2 +1,0 @@
-# KHATU_SHYAM_ENTERPRISES
-test_web
