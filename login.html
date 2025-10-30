@@ -37,7 +37,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <!-- Firebase Init -->
-    <script src="firebase-init.js"></script>
+    <script src="src/firebase-init.js"></script>
 </head>
 <body class="bg-background-light dark:bg-background-dark font-display">
     <div class="relative flex min-h-screen flex-col justify-center overflow-hidden py-6 sm:py-12">
@@ -174,99 +174,6 @@
             });
         });
     </script>
-     <script>
-        window.onload = function () {
-            const phoneNumberInput = document.getElementById('phone-number-input');
-            const sendOtpButton = document.getElementById('send-otp-button');
-            const verifyOtpButton = document.getElementById('verify-otp-button');
-            const otpSection = document.getElementById('otp-section');
-            const errorMessage = document.getElementById('error-message');
-
-            // Initialize reCAPTCHA verifier
-            window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
-                'size': 'invisible',
-                'callback': (response) => {
-                    // reCAPTCHA solved, allow signInWithPhoneNumber.
-                    console.log("reCAPTCHA solved");
-                }
-            });
-
-            sendOtpButton.addEventListener('click', () => {
-                const countryCode = document.getElementById('country-code-select').value;
-                const phoneNumber = phoneNumberInput.value;
-                const appVerifier = window.recaptchaVerifier;
-                const fullPhoneNumber = countryCode + phoneNumber;
-
-                auth.signInWithPhoneNumber(fullPhoneNumber, appVerifier)
-                    .then((confirmationResult) => {
-                        console.log("OTP sent");
-                        window.confirmationResult = confirmationResult;
-                        otpSection.classList.remove('hidden');
-                        errorMessage.textContent = '';
-                    }).catch((error) => {
-                        console.error("Error sending OTP:", error);
-                        errorMessage.textContent = "Error sending OTP. Please try again.";
-                        recaptchaVerifier.render().then(function(widgetId) {
-                           grecaptcha.reset(widgetId);
-                        });
-                    });
-            });
-
-            verifyOtpButton.addEventListener('click', () => {
-                const verificationCode = Array.from(document.querySelectorAll('.otp-input')).map(input => input.value).join('');
-                const errorMessage = document.getElementById('error-message');
-
-                if (!verificationCode || verificationCode.length !== 6) {
-                    errorMessage.textContent = 'Please enter a valid 6-digit OTP.';
-                    return;
-                }
-                
-                confirmationResult.confirm(verificationCode).then(async (result) => {
-                    const user = result.user;
-                    const phoneNumber = user.phoneNumber;
-                    
-                    try {
-                        // Pehle check karein ki user already exist karta hai ya nahi
-                        const userDoc = await db.collection('users').doc(user.uid).get();
-                        
-                        if (!userDoc.exists) {
-                            // Naya user hai, to Firestore mein save karein
-                            await db.collection('users').doc(user.uid).set({
-                                phoneNumber: phoneNumber,
-                                uid: user.uid,
-                                khatu_website_admin: false, // Default admin status
-                                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                                name: phoneNumber, // Default name phone number hai
-                                email: '', // Blank email
-                                address: '' // Blank address
-                            });
-                            
-                            console.log('New user added to Firestore database');
-                        } else {
-                            console.log('User already exists in database');
-                        }
-                        
-                        // User role check karein aur redirect karein
-                        const userData = await db.collection('users').doc(user.uid).get();
-                        const isAdmin = userData.data().khatu_website_admin;
-                        
-                        if (isAdmin === true) {
-                            window.location.href = 'admin_dashboard.html';
-                        } else {
-                            window.location.href = 'dashboard.html';
-                        }
-                        
-                    } catch (error) {
-                        console.error('Error saving user to database:', error);
-                        errorMessage.textContent = 'Login successful but error saving user data. Please contact support.';
-                    }
-                    
-                }).catch((error) => {
-                    errorMessage.textContent = 'Invalid verification code. Please try again.';
-                    console.error('Verification error:', error);
-                });
-            });
-        }
-    </script>
+    <script type="module" src="/src/login.js"></script>
 </body>
 </html>

@@ -13,15 +13,15 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     <!-- Google Maps API (for Price Calculator) -->
-    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBwZXP1zPwyTN-4DuwuTmRW2akHmVA6E3o&libraries=routes&callback=initPriceCalculator" async defer></script>
     <!-- App Scripts -->
-    <script src="firebase-init.js"></script>
-    <script src="input-validator.js"></script>
-    <script src="payment-gateway.js"></script>
-    <script src="price-calculator.js"></script>
-    <script src="rate-limiter.js"></script>
+    <script src="src/firebase-init.js"></script>
+    <script src="src/input-validator.js"></script>
+    <script src="src/payment-gateway.js"></script>
+    <script src="src/price-calculator.js"></script>
+    <script src="src/rate-limiter.js"></script>
     <link href="toast.css" rel="stylesheet"/>
-    <script src="error-handler.js"></script>
+    <script src="src/error-handler.js"></script>
 <script>
         tailwind.config = {
             darkMode: "class",
@@ -210,7 +210,7 @@
 </div>
 </div>
 </div>
-'''<script>
+<script>
     let bookingAmount = 100; // Default amount
 
     // 2. Auth State Listener (for auto-filling form)
@@ -245,14 +245,23 @@
         });
     }
 
+    let priceCalculator;
+    function initPriceCalculator() {
+        console.log("initPriceCalculator called");
+        priceCalculator = new PriceCalculator();
+    }
+
     const paymentGateway = new PaymentGateway();
-    const priceCalculator = new PriceCalculator();
 
     // Price Calculation Logic
     document.getElementById('calculate-price-button').addEventListener('click', async () => {
+        console.log("calculate-price-button clicked");
         const pickupPincode = document.getElementById('sender-pincode').value;
         const deliveryPincode = document.getElementById('receiver-pincode').value;
         const weight = parseFloat(document.getElementById('parcel-weight').value);
+        console.log("pickupPincode:", pickupPincode);
+        console.log("deliveryPincode:", deliveryPincode);
+        console.log("weight:", weight);
 
         if (!pickupPincode || !deliveryPincode || !weight) {
             ErrorHandler.show('Please enter Sender & Receiver PIN codes and Parcel Weight to calculate the price.', 'warning');
@@ -265,18 +274,24 @@
         try {
             const pricing = await priceCalculator.calculatePrice(pickupPincode, deliveryPincode, weight);
             if (pricing) {
-                priceBreakdownDiv.innerHTML = `
-                    <p>Distance: ${pricing.distance} km</p>
-                    <p>Base Price: ₹${pricing.basePrice}</p>
-                    <p>GST (18%): ₹${pricing.gst}</p>
-                    <h4 class="font-bold">Total: ₹${pricing.total}</h4>
-                `;
-                bookingAmount = parseFloat(pricing.total);
+                if (pricing.distance === null) {
+                    priceBreakdownDiv.innerHTML = 'Could not calculate distance. Please check PIN codes.';
+                    ErrorHandler.show('Could not calculate distance. Using fallback estimation.', 'warning');
+                } else {
+                    priceBreakdownDiv.innerHTML = `
+                        <p>Distance: ${pricing.distance} km</p>
+                        <p>Base Price: ₹${pricing.basePrice}</p>
+                        <p>GST (18%): ₹${pricing.gst}</p>
+                        <h4 class="font-bold">Total: ₹${pricing.total}</h4>
+                    `;
+                    bookingAmount = parseFloat(pricing.total);
+                }
             } else {
                 priceBreakdownDiv.innerHTML = 'Could not calculate price. Please check PIN codes.';
                 ErrorHandler.show('Could not calculate price. Please check PIN codes.', 'error');
             }
         } catch (error) {
+            console.error("Error in price calculation:", error);
             priceBreakdownDiv.innerHTML = 'Error in price calculation.';
             ErrorHandler.show(error.message || 'An error occurred during price calculation.', 'error');
         }
@@ -381,5 +396,4 @@
             ErrorHandler.handleFirebaseError(error);
         }
     }
-</script>'''
-</body></html>
+</script></body></html>

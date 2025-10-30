@@ -1,4 +1,4 @@
-'''/* toast.css */
+/* toast.css */
 .toast {
     position: fixed;
     top: 20px;
@@ -22,4 +22,3 @@
 .toast-error { background: #f44336; }
 .toast-warning { background: #ff9800; }
 .toast-info { background: #2196F3; } /* Added for consistency */
-'''

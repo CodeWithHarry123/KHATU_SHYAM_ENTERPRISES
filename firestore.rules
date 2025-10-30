@@ -1,32 +1,42 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Users collection - only authenticated users can read their own data
+    // Rules for the 'users' collection
     match /users/{userId} {
+      // Allow users to read and write their own data
       allow read, write: if request.auth != null && request.auth.uid == userId;
+      // Allow admins to read and write any user's data
+      allow read, write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.khatu_website_admin == true;
     }
-    
-    // Bookings collection - users can only access their own bookings
+
+    // Rules for the 'bookings' collection
     match /bookings/{bookingId} {
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
-      allow read, update: if request.auth != null && 
-        (request.auth.uid == resource.data.userId || 
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
-      allow delete: if request.auth != null && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      // Allow authenticated users to create bookings
+      allow create: if request.auth != null;
+      // Allow users to read their own bookings
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      // Allow admins to read and write any booking
+      allow read, write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.khatu_website_admin == true;
     }
-    
-    // Admin-only collections
-    match /settings/{document=**} {
-      allow read, write: if request.auth != null && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+
+    // Rules for the 'tracking' collection
+    match /tracking/{trackingId} {
+      // Allow anyone to read tracking information (public tracking page)
+      allow read: if true;
+      // Allow only admins or a trusted server-side process to write tracking updates
+      allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.khatu_website_admin == true;
     }
-    
-    // Reports - admin only
-    match /reports/{document=**} {
-      allow read, write: if request.auth != null && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+
+    // Rules for the 'reports' collection
+    match /reports/{reportId} {
+        // Allow only admins to read/write reports
+        allow read, write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.khatu_website_admin == true;
+    }
+
+    // Rules for the 'settings' collection
+    match /settings/{settingId} {
+        // Allow admins to read/write settings
+        allow read, write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.khatu_website_admin == true;
     }
   }
 }
