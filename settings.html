@@ -6,17 +6,8 @@
     <meta content="width=device-width, initial-scale=1.0" name="viewport" />
     <title>Settings - Khatu Shyam Enterprises</title>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700;800;900&amp;display=swap"
-        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
-    <!-- Firebase SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <!-- Firebase Init -->
-    <script src="src/firebase-init.js"></script>
-    <script src="src/backup-system.js"></script>
-    <script src="src/error-handler.js"></script>
     <script>
         tailwind.config = {
             darkMode: "class",
@@ -43,6 +34,9 @@
             },
         };
     </script>
+  <script type="module" crossorigin src="/KHATU_SHYAM_ENTERPRISES/assets/settings-Bkw8eVUa.js"></script>
+  <link rel="modulepreload" crossorigin href="/KHATU_SHYAM_ENTERPRISES/assets/firebase-init-C-AE0vWN.js">
+  <link rel="modulepreload" crossorigin href="/KHATU_SHYAM_ENTERPRISES/assets/lazy-loader-CPsUXe95.js">
   <link rel="stylesheet" crossorigin href="/KHATU_SHYAM_ENTERPRISES/assets/responsive-DjtURZ78.css">
   <link rel="stylesheet" crossorigin href="/KHATU_SHYAM_ENTERPRISES/assets/toast-nHQ2b3SR.css">
 </head>
@@ -152,27 +146,7 @@
                                         <button type="submit" class="px-6 py-2 rounded-lg bg-primary text-white font-bold">Save Changes</button>
                                     </div>
                                 </form>
-                                <hr class="my-8 dark:border-gray-700">
-                                <h2 class="text-xl font-bold mb-6">Change Password</h2>
-                                <form class="space-y-6">
-                                    <label class="flex flex-col">
-                                        <p class="font-medium pb-2">Current Password</p>
-                                        <input type="password" class="form-input rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:border-primary focus:ring-primary">
-                                    </label>
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <label class="flex flex-col">
-                                            <p class="font-medium pb-2">New Password</p>
-                                            <input type="password" class="form-input rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:border-primary focus:ring-primary">
-                                        </label>
-                                        <label class="flex flex-col">
-                                            <p class="font-medium pb-2">Confirm New Password</p>
-                                            <input type="password" class="form-input rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:border-primary focus:ring-primary">
-                                        </label>
-                                    </div>
-                                    <div class="flex justify-end">
-                                        <button type="submit" class="px-6 py-2 rounded-lg bg-primary text-white font-bold">Update Password</button>
-                                    </div>
-                                </form>
+
                             </div>
 
                             <div id="application" class="tab-content hidden bg-white dark:bg-background-dark p-6 rounded-xl shadow-md">
@@ -225,103 +199,6 @@
             </main>
         </div>
     </div>
-        <script>
-            // --- AUTHENTICATION ---
-            auth.onAuthStateChanged(async (user) => {
-                if (user) {
-                    try {
-                        const userDoc = await db.collection('users').doc(user.uid).get();
-                        if (userDoc.exists && userDoc.data().khatu_website_admin) {
-                            console.log("Admin user authenticated successfully.");
-                        } else {
-                            ErrorHandler.show("Access Denied. You do not have permission to view this page.", "error");
-                            window.location.href = 'dashboard.html';
-                        }
-                    } catch (error) {
-                        ErrorHandler.handleFirebaseError(error);
-                        window.location.href = 'login.html';
-                    }
-                } else {
-                    console.log("No user logged in. Redirecting to login.");
-                    window.location.href = 'login.html';
-                }
-            });
-    
-            // --- UI ELEMENTS ---
-            const logoutButton = document.getElementById('logout-button');
-            const sidebar = document.getElementById('sidebar');
-            const sidebarToggle = document.getElementById('sidebar-toggle');
-            const tabButtons = document.querySelectorAll('.tab-button');
-            const tabContents = document.querySelectorAll('.tab-content');
-            const darkModeToggle = document.getElementById('dark-mode-toggle');
-    
-            // --- EVENT LISTENERS ---
-            sidebarToggle.addEventListener('click', () => {
-                sidebar.classList.toggle('-translate-x-full');
-            });
-    
-            logoutButton.addEventListener('click', (e) => {
-                e.preventDefault();
-                auth.signOut().then(() => {
-                    window.location.href = 'index.html';
-                });
-            });
-    
-            tabButtons.forEach(button => {
-                button.addEventListener('click', () => {
-                    tabButtons.forEach(btn => btn.classList.remove('active', 'bg-primary/10', 'text-primary'));
-                    tabContents.forEach(content => content.classList.add('hidden'));
-                    button.classList.add('active', 'bg-primary/10', 'text-primary');
-                    document.getElementById(button.dataset.tab).classList.remove('hidden');
-                });
-            });
-            
-            // Dark Mode Toggle
-            if (localStorage.getItem('color-theme') === 'dark') {
-                document.documentElement.classList.add('dark');
-                darkModeToggle.checked = true;
-            } else {
-                document.documentElement.classList.remove('dark')
-                darkModeToggle.checked = false;
-            }
-    
-            darkModeToggle.addEventListener('change', function() {
-                if (localStorage.getItem('color-theme')) {
-                    if (localStorage.getItem('color-theme') === 'light') {
-                        document.documentElement.classList.add('dark');
-                        localStorage.setItem('color-theme', 'dark');
-                    } else {
-                        document.documentElement.classList.remove('dark');
-                        localStorage.setItem('color-theme', 'light');
-                    }
-                } else {
-                    if (document.documentElement.classList.contains('dark')) {
-                        document.documentElement.classList.remove('dark');
-                        localStorage.setItem('color-theme', 'light');
-                    } else {
-                        document.documentElement.classList.add('dark');
-                        localStorage.setItem('color-theme', 'dark');
-                    }
-                }
-            });
-    
-            // --- BACKUP & RESTORE ---
-            const backupSystem = new BackupSystem();
-            const exportButton = document.getElementById('export-data-button');
-            const importInput = document.getElementById('import-data-input');
-    
-            exportButton.addEventListener('click', () => {
-                backupSystem.exportAllData();
-            });
-    
-            importInput.addEventListener('change', (event) => {
-                const file = event.target.files[0];
-                if (file) {
-                    if (confirm('Are you sure you want to import data? This will overwrite existing data and cannot be undone.')) {
-                        backupSystem.importData(file);
-                    }
-                }
-            });
-        </script></body>
+</body>
 
 </html>

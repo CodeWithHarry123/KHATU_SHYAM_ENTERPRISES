@@ -6,18 +6,10 @@
     <meta content="width=device-width, initial-scale=1.0" name="viewport" />
     <title>Admin Dashboard - Khatu Shyam Enterprises</title>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700;800;900&amp;display=swap"
-        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
-    <!-- Firebase SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <!-- Chart.js for charts -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- App Scripts -->
-    <script src="src/firebase-init.js"></script>
-    <script src="src/admin-analytics.js"></script>
     <script>
         tailwind.config = {
             darkMode: "class",
@@ -56,10 +48,20 @@
         .animate-slide-in { animation: slide-in 0.3s ease-out; }
         .animate-slide-out { animation: slide-out 0.3s ease-in; }
     </style>
+  <script type="module" crossorigin src="/KHATU_SHYAM_ENTERPRISES/assets/admin_dashboard-CBgKpCM3.js"></script>
+  <link rel="modulepreload" crossorigin href="/KHATU_SHYAM_ENTERPRISES/assets/firebase-init-C-AE0vWN.js">
+  <link rel="modulepreload" crossorigin href="/KHATU_SHYAM_ENTERPRISES/assets/loader-NzwXbrqv.js">
+  <link rel="stylesheet" crossorigin href="/KHATU_SHYAM_ENTERPRISES/assets/loader-B0azcuS2.css">
   <link rel="stylesheet" crossorigin href="/KHATU_SHYAM_ENTERPRISES/assets/responsive-DjtURZ78.css">
 </head>
 
 <body class="bg-background-light dark:bg-background-dark font-display text-text-light dark:text-text-dark">
+    <div id="loading-overlay">
+        <div class="loader-container">
+            <div class="loader"></div>
+            <p class="loader-text">Loading your data...</p>
+        </div>
+    </div>
     <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
     <div class="relative flex min-h-screen w-full flex-col group/design-root overflow-x-hidden">
         <div class="flex h-full grow">
@@ -204,101 +206,6 @@
             </main>
         </div>
     </div>
-    <script>
-        function showToast(message, type = 'info') {
-            const container = document.getElementById('toast-container');
-            if (!container) return;
-
-            const colors = {
-                success: 'bg-green-500',
-                error: 'bg-red-500',
-                warning: 'bg-yellow-500',
-                info: 'bg-blue-500'
-            };
-            const icons = {
-                success: '✓',
-                error: '✗',
-                warning: '⚠',
-                info: 'ℹ'
-            };
-
-            const toast = document.createElement('div');
-            toast.className = `${colors[type]} text-white px-6 py-4 rounded-lg shadow-lg flex items-center space-x-3 animate-slide-in`;
-            toast.innerHTML = `
-                <span class="text-2xl">${icons[type]}</span>
-                <span class="font-medium">${message}</span>
-                <button onclick="this.parentElement.remove()" class="ml-4 text-white hover:text-gray-200">✕</button>
-            `;
-
-            container.appendChild(toast);
-
-            setTimeout(() => {
-                toast.classList.add('animate-slide-out');
-                setTimeout(() => toast.remove(), 300);
-            }, 5000);
-        }
-
-        // --- AUTHENTICATION ---
-        auth.onAuthStateChanged(user => {
-            if (user) {
-                db.collection('users').doc(user.uid).get()
-                    .then((doc) => {
-                        if (doc.exists && doc.data().khatu_website_admin === true) {
-                            console.log("Admin user authenticated successfully.");
-                            loadDashboard();
-                        } else {
-                            console.log("Access Denied: User is not an admin.");
-                            showToast("Access Denied. You do not have permission to view this page.", "error");
-                            window.location.href = 'dashboard.html';
-                        }
-                    })
-                    .catch((error) => {
-                        console.error("Error getting user document:", error);
-                        window.location.href = 'login.html';
-                    });
-            } else {
-                console.log("No user logged in. Redirecting to login.");
-                window.location.href = 'login.html';
-            }
-        });
-
-        // --- UI ELEMENTS ---
-        const logoutButton = document.getElementById('logout-button');
-        const sidebar = document.getElementById('sidebar');
-        const sidebarToggle = document.getElementById('sidebar-toggle');
-
-        // --- EVENT LISTENERS ---
-        sidebarToggle.addEventListener('click', () => {
-            sidebar.classList.toggle('-translate-x-full');
-        });
-
-        logoutButton.addEventListener('click', (e) => {
-            e.preventDefault();
-            auth.signOut().then(() => {
-                window.location.href = 'index.html';
-            });
-        });
-
-        // Dark Mode Check
-        if (localStorage.getItem('color-theme') === 'dark') {
-            document.documentElement.classList.add('dark');
-        } else {
-            document.documentElement.classList.remove('dark');
-        }
-
-        // --- DASHBOARD LOADING ---
-        async function loadDashboard() {
-            const analytics = new AdminAnalytics();
-            try {
-                const data = await analytics.getDashboardData();
-                analytics.renderDashboard(data);
-            } catch (error) {
-                console.error("Error loading dashboard data:", error);
-                showToast("Could not load dashboard data.", "error");
-            }
-        }
-
-    </script>
 </body>
 
 </html>
