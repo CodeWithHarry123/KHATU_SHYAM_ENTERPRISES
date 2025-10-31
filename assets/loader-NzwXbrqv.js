@@ -1,0 +1,1 @@
+function d(){const e=document.getElementById("loading-overlay");e&&e.classList.remove("hidden")}function o(){const e=document.getElementById("loading-overlay");e&&e.classList.add("hidden")}export{o as h,d as s};
