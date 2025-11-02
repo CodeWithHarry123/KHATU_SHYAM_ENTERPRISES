@@ -37,12 +37,9 @@
                 },
             };
         </script>
-        <!-- Firebase SDKs -->
-        <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-        <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-        <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
         <!-- Firebase Init -->
-        <script src="firebase-init.js"></script>
+      <script type="module" crossorigin src="/KHATU_SHYAM_ENTERPRISES/assets/login-Dsv5ypSY.js"></script>
+      <link rel="modulepreload" crossorigin href="/KHATU_SHYAM_ENTERPRISES/assets/firebase-init-C-AE0vWN.js">
       <link rel="stylesheet" crossorigin href="/KHATU_SHYAM_ENTERPRISES/assets/responsive-DjtURZ78.css">
     </head>
     <body class="bg-background-light dark:bg-background-dark font-display">
@@ -137,137 +134,5 @@
                 </div>
             </div>
         </div>
-        <script>
-            window.onload = function () {
-                // Initialize intl-tel-input
-                const phoneInput = document.querySelector("#phone");
-                window.iti = window.intlTelInput(phoneInput, {
-                    utilsScript: "https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/utils.js",
-                    initialCountry: "in"
-                });
-                console.log("intl-tel-input v17.0.8 ACTIVATED!");
-
-                const sendOtpButton = document.getElementById('send-otp-button');
-                const verifyOtpButton = document.getElementById('verify-otp-button');
-                const otpSection = document.getElementById('otp-section');
-                const errorMessage = document.getElementById('error-message');
-
-                // Initialize reCAPTCHA verifier
-                window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
-                    'size': 'invisible',
-                    'callback': (response) => {
-                        console.log("reCAPTCHA solved");
-                    }
-                });
-
-                sendOtpButton.addEventListener('click', () => {
-                    errorMessage.textContent = '';
-                    if (window.iti.isValidNumber()) {
-                        const fullPhoneNumber = window.iti.getNumber();
-                        const appVerifier = window.recaptchaVerifier;
-
-                        auth.signInWithPhoneNumber(fullPhoneNumber, appVerifier)
-                            .then((confirmationResult) => {
-                                console.log("OTP sent");
-                                window.confirmationResult = confirmationResult;
-                                otpSection.classList.remove('hidden');
-                            }).catch((error) => {
-                                console.error("Error sending OTP:", error);
-                                errorMessage.textContent = "Error sending OTP. Please try again.";
-                                recaptchaVerifier.render().then(function(widgetId) {
-                                   grecaptcha.reset(widgetId);
-                                });
-                            });
-                    } else {
-                        console.error("Invalid number entered");
-                        errorMessage.textContent = "Please enter a valid phone number.";
-                    }
-                });
-
-                verifyOtpButton.addEventListener('click', () => {
-                    const otpInputs = document.querySelectorAll('#otp-fieldset input');
-                    const verificationCode = Array.from(otpInputs).map(input => input.value).join('');
-                    
-                    if (!verificationCode || verificationCode.length !== 6) {
-                        errorMessage.textContent = 'Please enter a valid 6-digit OTP.';
-                        return;
-                    }
-                    
-                    confirmationResult.confirm(verificationCode).then(async (result) => {
-                        const user = result.user;
-                        const phoneNumber = user.phoneNumber;
-                        
-                        try {
-                            const userDoc = await db.collection('users').doc(user.uid).get();
-                            
-                            if (!userDoc.exists) {
-                                await db.collection('users').doc(user.uid).set({
-                                    phoneNumber: phoneNumber,
-                                    uid: user.uid,
-                                    khatu_website_admin: false,
-                                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                                    name: phoneNumber,
-                                    email: '',
-                                    address: ''
-                                });
-                                console.log('New user added to Firestore database');
-                            } else {
-                                console.log('User already exists in database');
-                            }
-                            
-                            const userData = await db.collection('users').doc(user.uid).get();
-                            const isAdmin = userData.data().khatu_website_admin;
-                            
-                            if (isAdmin === true) {
-                                window.location.href = 'admin_dashboard.html';
-                            } else {
-                                window.location.href = 'dashboard.html';
-                            }
-                            
-                        } catch (error) {
-                            console.error('Error saving user to database:', error);
-                            errorMessage.textContent = 'Login successful but error saving user data. Please contact support.';
-                        }
-                        
-                    }).catch((error) => {
-                        errorMessage.textContent = 'Invalid verification code. Please try again.';
-                        console.error('Verification error:', error);
-                    });
-                });
-
-                const otpFieldSet = document.getElementById('otp-fieldset');
-                const otpInputs = otpFieldSet.querySelectorAll('.otp-input');
-
-                otpInputs.forEach((input, index) => {
-                    input.addEventListener('input', (e) => {
-                        const value = e.target.value;
-                        if (value.length > 0 && index < otpInputs.length - 1) {
-                            otpInputs[index + 1].focus();
-                        }
-                    });
-
-                    input.addEventListener('keydown', (e) => {
-                        if (e.key === 'Backspace' && input.value === '' && index > 0) {
-                            otpInputs[index - 1].focus();
-                        } else if (e.key === 'ArrowLeft' && index > 0) {
-                            otpInputs[index - 1].focus();
-                        } else if (e.key === 'ArrowRight' && index < otpInputs.length - 1) {
-                            otpInputs[index + 1].focus();
-                        }
-                    });
-
-                    input.addEventListener('paste', (e) => {
-                        e.preventDefault();
-                        const pasteData = e.clipboardData.getData('text');
-                        const otpArray = pasteData.split('').slice(0, otpInputs.length);
-                        otpArray.forEach((char, i) => {
-                            otpInputs[i].value = char;
-                        });
-                        const nextFocusIndex = Math.min(otpInputs.length - 1, pasteData.length);
-                        otpInputs[nextFocusIndex].focus();
-                    });
-                });
-            }
-        </script>
     </body>
     </html>
